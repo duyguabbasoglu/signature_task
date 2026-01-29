@@ -1,0 +1,28 @@
+# Bounding Box Detector Configuration
+
+detector:
+  min_component_area: 25
+  empty_threshold: 50
+
+  # Punctuation max area
+  punct_max_area: 500
+
+  # Max components for punctuation
+  punct_max_components: 3
+
+  # Morphological kernel
+  morph_kernel_size: 2
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+
+llm:
+  endpoint: "https://common-inference-apis.test-turkcelltech.ai/gpt-oss-120b/v1"
+  model: "gpt-oss-120b"
+  # API key should be set via environment variable: BBOX_LLM_API_KEY
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

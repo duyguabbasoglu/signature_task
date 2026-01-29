@@ -2,7 +2,6 @@ __pycache__/
 .venv/
 .env
 .DS_Store
-
-data/private/
-data/raw/
+__init__.py
+data/
 *.log
