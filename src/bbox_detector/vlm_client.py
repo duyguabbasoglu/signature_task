@@ -124,8 +124,20 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
             response.raise_for_status()
             
             data = response.json()
-            content = data["choices"][0]["message"]["content"].strip().upper()
-            return content, None
+            logger.debug(f"VLM response: {data}")
+            
+            # Parse response safely
+            choices = data.get("choices", [])
+            if not choices:
+                raise ValueError(f"No choices in response: {data}")
+            
+            message = choices[0].get("message", {})
+            content = message.get("content")
+            
+            if content is None:
+                raise ValueError(f"No content in response: {data}")
+            
+            return content.strip().upper(), None
 
         except requests.exceptions.Timeout:
             logger.warning("VLM request timed out")
