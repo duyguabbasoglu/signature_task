@@ -3,6 +3,8 @@
 
 import sys
 import os
+os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
+import cv2
 
 # Path ekle
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

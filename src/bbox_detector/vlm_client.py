@@ -60,7 +60,7 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
     ):
         self.endpoint = endpoint or os.getenv(
             "BBOX_LLM_ENDPOINT",
-            "https://common-inference-apis.test-turkcelltech.ai/gpt-oss-120b/v1"
+            "https://common-inference-apis.turkcelltech.ai/gpt-oss-120b/v1"
         )
         self.model = model or os.getenv("BBOX_LLM_MODEL", "gpt-oss-120b")
         self.api_key = api_key or os.getenv(
