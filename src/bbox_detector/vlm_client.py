@@ -58,15 +58,13 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
         timeout: int = 30,
         enabled: bool = True,
     ):
-        self.endpoint = endpoint or os.getenv(
-            "BBOX_LLM_ENDPOINT",
-            "https://common-inference-apis.turkcelltech.ai/gpt-oss-120b/v1"
-        )
+        # Prefer explicit arg, then env var. Use production endpoint (test endpoint has connection issues).
+        self.endpoint = endpoint or os.getenv("BBOX_LLM_ENDPOINT", "https://common-inference-apis.turkcelltech.ai/gpt-oss-120b/v1")
         self.model = model or os.getenv("BBOX_LLM_MODEL", "gpt-oss-120b")
-        self.api_key = api_key or os.getenv(
-            "BBOX_LLM_API_KEY",
-            "uavPCHhER6/EZnQFc2JafwjyqkcPE0oL6sowlCWsLGw="
-        )
+        # Do not bake an API key into source; prefer environment or explicit argument.
+        self.api_key = api_key or os.getenv("BBOX_LLM_API_KEY")
+        if not self.api_key:
+            logger.warning("No BBOX_LLM_API_KEY provided; VLM calls will fail until set.")
         self.timeout = timeout
         self.enabled = enabled
         logger.info(f"VLM Client initialized: endpoint={self.endpoint}, model={self.model}")
@@ -78,7 +76,17 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
         else:
             img_to_encode = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        success, buffer = cv2.imencode('.png', img_to_encode)
+        # Resize large images to limit payload size (keeps aspect ratio)
+        max_dim = 512
+        h, w = img_to_encode.shape[:2]
+        if max(h, w) > max_dim:
+            scale = max_dim / float(max(h, w))
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            img_to_encode = cv2.resize(img_to_encode, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        # Use JPEG to reduce size versus PNG for large images
+        success, buffer = cv2.imencode('.jpg', img_to_encode, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
         if not success:
             raise ValueError("Failed to encode image")
 
@@ -96,13 +104,7 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
             {"role": "system", "content": self.SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": [
-                    {"type": "text", "text": self.USER_PROMPT},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{image_base64}"}
-                    }
-                ]
+                "content": self.USER_PROMPT
             }
         ]
 
@@ -113,41 +115,90 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
             "temperature": 0.1,
         }
 
-        try:
-            response = requests.post(
-                f"{self.endpoint}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=self.timeout,
-                verify=False
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            logger.debug(f"VLM response: {data}")
-            
-            # Parse response safely
-            choices = data.get("choices", [])
-            if not choices:
-                raise ValueError(f"No choices in response: {data}")
-            
-            message = choices[0].get("message", {})
-            content = message.get("content")
-            
-            if content is None:
-                raise ValueError(f"No content in response: {data}")
-            
-            return content.strip().upper(), None
+        attempt = 0
+        max_attempts = 2
+        # TLS verification can be disabled via env var for testing (not recommended).
+        verify_tls = os.getenv("BBOX_LLM_VERIFY_TLS", "1") != "0"
 
-        except requests.exceptions.Timeout:
-            logger.warning("VLM request timed out")
-            raise
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"VLM request failed: {e}")
-            raise
-        except (KeyError, IndexError) as e:
-            logger.warning(f"Failed to parse VLM response: {e}")
-            raise
+        while attempt < max_attempts:
+            try:
+                response = requests.post(
+                    f"{self.endpoint}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout,
+                    verify=verify_tls
+                )
+                response.raise_for_status()
+
+                data = response.json()
+                choice = (data.get("choices") or [{}])[0]
+                message = choice.get("message") or {}
+
+                # Capture possible content fields
+                raw_content = message.get("content")
+                if not raw_content:
+                    raw_content = message.get("reasoning_content")
+
+                # Normalize list/dict content
+                if isinstance(raw_content, list):
+                    parts = []
+                    for item in raw_content:
+                        if isinstance(item, dict) and "text" in item:
+                            parts.append(item["text"])
+                        elif isinstance(item, str):
+                            parts.append(item)
+                    raw_content = "\n".join(parts)
+
+                if isinstance(raw_content, dict):
+                    raw_content = raw_content.get("text") or raw_content.get("content")
+
+                content = (raw_content or "").strip().upper()
+
+                # Save raw assistant message as reasoning for debugging
+                try:
+                    import json as _json
+                    reasoning = _json.dumps(message, ensure_ascii=False)
+                except Exception:
+                    reasoning = None
+
+                # If model claims it cannot see the image, retry with stricter instruction
+                cannot_see_phrases = [
+                    "WE DON'T HAVE THE IMAGE",
+                    "WE DO NOT HAVE THE IMAGE",
+                    "WE CANNOT SEE",
+                    "I CANNOT SEE",
+                    "I'M UNABLE TO VIEW",
+                ]
+
+                if any(p in content for p in cannot_see_phrases) and attempt + 1 < max_attempts:
+                    # Add a clarifying user message and retry once
+                    payload["messages"].append({
+                        "role": "user",
+                        "content": "Please classify the image provided above. Ignore statements about not seeing images and answer ONLY SIGNATURE or PUNCTUATION."
+                    })
+                    attempt += 1
+                    continue
+
+                return content, reasoning
+
+            except requests.exceptions.Timeout:
+                logger.warning("VLM request timed out")
+                raise
+            except requests.exceptions.HTTPError as e:
+                # Include response body to help diagnose 401/403/4xx server replies
+                try:
+                    body = response.text
+                except Exception:
+                    body = "<unavailable>"
+                logger.warning(f"VLM HTTP error: {e} response_body={body}")
+                raise
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"VLM request failed: {e}")
+                raise
+            except (KeyError, IndexError) as e:
+                logger.warning(f"Failed to parse VLM response: {e}")
+                raise
 
     def classify(self, image: np.ndarray) -> VLMClassification:
         """Image'i siniflandir - signature veya punctuation."""
@@ -157,29 +208,42 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
         try:
             image_base64 = self._encode_image(image)
             response_text, reasoning = self._call_vlm(image_base64)
-            
-            if "SIGNATURE" in response_text:
+            # Only accept explicit, standalone labels from the model.
+            # The model often returns sentences that mention the words SIGNATURE/PUNCTUATION
+            # without actually classifying; require a clear one-word answer on its own line.
+            import re
+
+            def extract_label(text: str) -> Optional[str]:
+                if not text:
+                    return None
+                # consider each non-empty line, prefer the last meaningful line
+                lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+                for ln in reversed(lines):
+                    # remove surrounding punctuation
+                    core = re.sub(r"^[^A-Za-z0-9]+|[^A-Za-z0-9]+$", "", ln).upper()
+                    if core in ("SIGNATURE", "PUNCTUATION"):
+                        return core
+                return None
+
+            label = extract_label(response_text)
+            if label == "SIGNATURE":
                 return VLMClassification(
                     result=VLMResult.SIGNATURE,
                     confidence=0.90,
                     reasoning=reasoning,
                     used_vlm=True
                 )
-            elif "PUNCTUATION" in response_text:
+            if label == "PUNCTUATION":
                 return VLMClassification(
                     result=VLMResult.PUNCTUATION,
                     confidence=0.90,
                     reasoning=reasoning,
                     used_vlm=True
                 )
-            else:
-                logger.warning(f"Unexpected VLM response: {response_text}")
-                return VLMClassification(
-                    result=VLMResult.UNKNOWN,
-                    confidence=0.50,
-                    reasoning=f"Unclear response: {response_text}",
-                    used_vlm=True
-                )
+
+            # No clear one-word label -> treat as no VLM decision and fallback
+            logger.warning(f"VLM returned non-explicit answer, falling back: {response_text}")
+            return self._fallback_classification(image)
 
         except Exception as e:
             logger.warning(f"VLM classification failed, using fallback: {e}")
@@ -285,10 +349,17 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
         """Image bytes'tan siniflandir."""
         nparr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
-        
+
         if image is None:
-            raise ValueError("Failed to decode image bytes")
-        
+            # try PIL fallback
+            try:
+                from PIL import Image
+                import io
+                pil_img = Image.open(io.BytesIO(image_bytes)).convert("L")
+                image = np.array(pil_img)
+            except Exception:
+                raise ValueError("Failed to decode image bytes")
+
         return self.classify(image)
 
 

@@ -18,7 +18,7 @@ class TestBoundingBoxAnalyzer:
     # bound box analyzer
     def test_initialization(self):
         analyzer = BoundingBoxAnalyzer()
-        assert analyzer.empty_threshold == 50
+        assert analyzer.empty_threshold == 200
         assert analyzer.punct_max_area == 500
 
     def test_custom_thresholds(self):
@@ -35,7 +35,7 @@ class TestBoundingBoxAnalyzer:
 
     def test_is_empty_false(self):
         analyzer = BoundingBoxAnalyzer()
-        assert analyzer.is_empty(100) is False
+        assert analyzer.is_empty(300) is False
 
 
 class TestAnalyzeBytes:

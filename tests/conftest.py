@@ -27,7 +27,7 @@ def punct_image() -> bytes:
     # create an image with punctuation-like content
     img = np.ones((100, 200), dtype=np.uint8) * 255
 
-    cv2.circle(img, (100, 50), 5, 0, -1)
+    cv2.circle(img, (100, 50), 10, 0, -1)
     _, buffer = cv2.imencode('.png', img)
     return buffer.tobytes()
 

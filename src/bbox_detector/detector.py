@@ -37,7 +37,7 @@ class AnalysisResult:
 
 
 MIN_COMPONENT_AREA = 25
-EMPTY_THRESHOLD = 50
+EMPTY_THRESHOLD = 200
 PUNCT_MAX_AREA = 500
 PUNCT_MAX_COMPONENTS = 3
 MORPH_KERNEL_SIZE = 2
@@ -261,3 +261,211 @@ def process_folder(data_dir: str = "data") -> list:
             logger.error(f"Error processing {img_path.name}: {e}")
 
     return results
+
+
+# -----------------------------------------------------------------------------
+# Unified Signature Detection API
+# Returns: True = Signature, False = Empty or Punctuation
+# -----------------------------------------------------------------------------
+
+def is_signature(image_path: str, use_vlm: bool = True) -> bool:
+    """
+    Determine if image contains a signature.
+    
+    Args:
+        image_path: Path to image file
+        use_vlm: Whether to use VLM for classification (default True)
+    
+    Returns:
+        True if signature detected, False if empty or punctuation
+    """
+    # Step 1: Check if empty
+    result = analyze(image_path)
+    
+    if result.is_empty:
+        logger.debug(f"is_signature({image_path}): False (empty)")
+        return False
+    
+    # Step 2: If filled, determine signature vs punctuation
+    if use_vlm:
+        try:
+            from bbox_detector.vlm_client import VLMClient, VLMResult
+            gray = _analyzer.load_image(image_path)
+            vlm_client = VLMClient()
+            classification = vlm_client.classify(gray)
+            
+            if classification.result == VLMResult.SIGNATURE:
+                logger.debug(f"is_signature({image_path}): True (VLM)")
+                return True
+            elif classification.result == VLMResult.PUNCTUATION:
+                logger.debug(f"is_signature({image_path}): False (VLM punctuation)")
+                return False
+            else:
+                # VLM unknown - use rule-based fallback
+                is_sig = not result.is_punctuation
+                logger.debug(f"is_signature({image_path}): {is_sig} (VLM unknown, fallback)")
+                return is_sig
+                
+        except Exception as e:
+            logger.warning(f"VLM failed, using rule-based: {e}")
+            # Fallback to rule-based
+            is_sig = not result.is_punctuation
+            logger.debug(f"is_signature({image_path}): {is_sig} (fallback)")
+            return is_sig
+    else:
+        # Rule-based only
+        is_sig = not result.is_punctuation
+        logger.debug(f"is_signature({image_path}): {is_sig} (rule-based)")
+        return is_sig
+
+
+def is_signature_bytes(image_bytes: bytes, use_vlm: bool = True) -> bool:
+    """
+    Determine if image bytes contain a signature.
+    
+    Args:
+        image_bytes: Image as bytes
+        use_vlm: Whether to use VLM for classification (default True)
+    
+    Returns:
+        True if signature detected, False if empty or punctuation
+    """
+    # Step 1: Check if empty
+    result = analyze_bytes(image_bytes)
+    
+    if result.is_empty:
+        return False
+    
+    # Step 2: If filled, determine signature vs punctuation
+    if use_vlm:
+        try:
+            from bbox_detector.vlm_client import VLMClient, VLMResult
+            vlm_client = VLMClient()
+            classification = vlm_client.classify_bytes(image_bytes)
+            
+            if classification.result == VLMResult.SIGNATURE:
+                return True
+            elif classification.result == VLMResult.PUNCTUATION:
+                return False
+            else:
+                # VLM unknown - use rule-based fallback
+                return not result.is_punctuation
+                
+        except Exception as e:
+            logger.warning(f"VLM failed, using rule-based: {e}")
+            return not result.is_punctuation
+    else:
+        # Rule-based only
+        return not result.is_punctuation
+
+
+def get_expected_result(filename: str) -> bool:
+    """
+    Get expected classification result based on filename pattern.
+    
+    Returns:
+        True if expected to be signature, False if expected to be empty/punctuation
+    """
+    name_lower = filename.lower()
+    
+    # Empty files
+    if name_lower.startswith("empty_"):
+        return False
+    
+    # Punctuation files
+    if name_lower.startswith("punct_"):
+        return False
+    
+    # IMG converted files are punctuation
+    if "img_" in name_lower and "_converted" in name_lower:
+        return False
+    
+    # Everything else (B-S-*, H-S-*, etc.) is signature
+    return True
+
+
+def test_accuracy(data_dir: str = "data", use_vlm: bool = False) -> dict:
+    """
+    Test classification accuracy on data folder.
+    
+    Args:
+        data_dir: Path to data folder
+        use_vlm: Whether to use VLM (default False for local testing)
+    
+    Returns:
+        Dict with accuracy metrics
+    """
+    data_path = Path(data_dir)
+    
+    extensions = ("*.png", "*.jpg", "*.jpeg", "*.PNG",
+                  "*.JPG", "*.JPEG", "*.tif", "*.TIF")
+    
+    image_paths = []
+    for ext in extensions:
+        image_paths.extend(list(data_path.glob(ext)))
+    
+    image_paths.sort(key=lambda x: x.name)
+    
+    correct = 0
+    total = 0
+    errors = []
+    
+    # Track by category
+    categories = {
+        "empty": {"correct": 0, "total": 0, "errors": []},
+        "punct": {"correct": 0, "total": 0, "errors": []},
+        "signature": {"correct": 0, "total": 0, "errors": []}
+    }
+    
+    for img_path in image_paths:
+        filename = img_path.name
+        expected = get_expected_result(filename)
+        
+        # Determine category
+        name_lower = filename.lower()
+        if name_lower.startswith("empty_"):
+            category = "empty"
+        elif name_lower.startswith("punct_") or ("img_" in name_lower and "_converted" in name_lower):
+            category = "punct"
+        else:
+            category = "signature"
+        
+        try:
+            actual = is_signature(str(img_path), use_vlm=use_vlm)
+            
+            total += 1
+            categories[category]["total"] += 1
+            
+            if actual == expected:
+                correct += 1
+                categories[category]["correct"] += 1
+            else:
+                error_info = {"file": filename, "expected": expected, "actual": actual}
+                errors.append(error_info)
+                categories[category]["errors"].append(error_info)
+                
+        except Exception as e:
+            logger.error(f"Error processing {filename}: {e}")
+            errors.append({"file": filename, "error": str(e)})
+    
+    accuracy = correct / total if total > 0 else 0
+    
+    result = {
+        "total": total,
+        "correct": correct,
+        "accuracy": round(accuracy * 100, 2),
+        "errors": errors,
+        "by_category": {}
+    }
+    
+    for cat, data in categories.items():
+        cat_acc = data["correct"] / data["total"] if data["total"] > 0 else 0
+        result["by_category"][cat] = {
+            "total": data["total"],
+            "correct": data["correct"],
+            "accuracy": round(cat_acc * 100, 2),
+            "errors": data["errors"]
+        }
+    
+    return result
+
