@@ -1,7 +1,32 @@
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
 .venv/
+*.egg-info/
+
+# Environment
 .env
+.env.*
+
+# OS
 .DS_Store
-__init__.py
+
+# IDE
+.vscode/
+.idea/
+
+# Data files (do not commit test data)
 data/
+*.tif
+*.TIF
+
+# Logs
 *.log
+
+# Results and cache
+vlm_*.json
+vlm_*.csv
+*.sample.json
+.pytest_cache/
+
