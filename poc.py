@@ -87,7 +87,15 @@ def load_image(path: str) -> np.ndarray:
     """Image yukle, grayscale'e cevir."""
     img = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     if img is None:
-        raise ValueError(f"Could not load image: {path}")
+        # Try PIL as a fallback for tricky tiff variants
+        try:
+            from PIL import Image
+            pil_img = Image.open(str(path))
+            pil_img = pil_img.convert("L")
+            arr = np.array(pil_img)
+            return arr
+        except Exception:
+            raise ValueError(f"Could not load image: {path}")
 
     if len(img.shape) == 2:
         return img
@@ -295,7 +303,15 @@ def analyze_bytes(image_bytes: bytes, use_vlm: bool = None) -> AnalysisResult:
     gray = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
 
     if gray is None:
-        raise ValueError("Could not decode image")
+        # Fallback to PIL decoding
+        try:
+            from PIL import Image
+            import io
+            pil_img = Image.open(io.BytesIO(image_bytes))
+            pil_img = pil_img.convert("L")
+            gray = np.array(pil_img)
+        except Exception:
+            raise ValueError("Could not decode image")
 
     bw = binarize(gray)
     total_area, component_count, largest_area = analyze_components(bw)

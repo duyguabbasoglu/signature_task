@@ -104,7 +104,18 @@ Respond with ONLY one word: SIGNATURE or PUNCTUATION"""
             {"role": "system", "content": self.SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": self.USER_PROMPT
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_base64}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": self.USER_PROMPT
+                    }
+                ]
             }
         ]
 

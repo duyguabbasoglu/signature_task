@@ -22,22 +22,10 @@ def test_vlm():
     print("=" * 70)
     
     # Test dosyalari
+    # Test edilecek yollar
     test_files = [
-        # Punct olmasi gerekenler
-        "data/test/punct_dot.png",
-        "data/test/punct_x.png", 
-        "data/test/punct_check.png",
-        "data/test/punct_square.png",
-        "data/test/punct_circle.png",
-        "data/test/punct_line.png",
-        # IMG dosyalari
-        "data/IMG_1807_converted.png",
-        "data/IMG_1808_converted.png", 
-        "data/IMG_1809_converted.png",
-        # Signature ornekleri
-        "data/B-S-1-F-01.tif",
-        "data/B-S-1-F-02.tif",
-        "data/H-S-2-G-15.tif",
+        Path("data/test"),
+        Path("data") # Ana data klasöründeki converted imajlar için
     ]
     
     print(f"{'FILE':<35} | {'RESULT':<8} | {'VLM':<5} | {'CONF':<6} | SHAPE")

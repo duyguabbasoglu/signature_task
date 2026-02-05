@@ -19,7 +19,7 @@ api:
   reload: true
 
 llm:
-  endpoint: "https://common-inference-apis.test-turkcelltech.ai/gpt-oss-120b/v1"
+  endpoint: "https://common-inference-apis.turkcelltech.ai/gpt-oss-120b/v1"
   model: "gpt-oss-120b"
   # API key should be set via environment variable: BBOX_LLM_API_KEY
 
