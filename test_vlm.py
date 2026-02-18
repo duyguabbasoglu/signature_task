@@ -33,15 +33,15 @@ def test_vlm():
     
     for f in test_files:
         if not Path(f).exists():
-            print(f"{f:<35} | DOSYA YOK")
+            print(f"{str(f):<35} | DOSYA YOK")
             continue
             
         try:
             result = poc.analyze(f, use_vlm=True)
             vlm_str = "✓" if result.used_vlm else "-"
-            print(f"{Path(f).name:<35} | {result.result.value:<8} | {vlm_str:<5} | {result.confidence:>5.0%} | {result.shape_type}")
+            print(f"{f.name:<35} | {result.result.value:<8} | {vlm_str:<5} | {result.confidence:>5.0%} | {result.shape_type}")
         except Exception as e:
-            print(f"{Path(f).name:<35} | ERROR: {e}")
+            print(f"{f.name:<35} | ERROR: {e}")
     
     print("-" * 80)
     print()
