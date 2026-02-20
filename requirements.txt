@@ -1,31 +1,11 @@
-# Core Image Processing
-opencv-python==4.13.0.70          # Computer vision library pinned to tested version
-numpy==2.4.1                       # Numerical computing pinned to tested version
-Pillow==10.1.0                     # Image processing & HEIC support
-
-# HEIC Format Support
-pillow-heif==1.2.0                 # Apple HEIC/HEIF codec
-
-# Data Processing
-pandas==2.2.0                       # CSV export and data manipulation
-
-# Development & Testing
-pytest==7.4.4                      # Unit testing framework
-pytest-cov==4.1.0                  # Code coverage measurement
-
-# API & Server (optional, for deployment)
-fastapi==0.109.0                   # Web API framework
-uvicorn==0.27.0                    # ASGI server
-pydantic==2.5.0                    # Data validation
-
-# Logging & Monitoring
-python-json-logger==2.0.7          # JSON structured logging
-
-# Type checking (development only)
-# mypy==1.7.1                      # Static type checker
-
-# Notes:
-# - All versions pinned for reproducibility and security
-# - Test on both CPU-only and GPU environments
-# - For production: consider separate requirements-dev.txt for dev-only tools
-# - Update dependencies quarterly with security audit
+opencv-python==4.13.0.70  # opencv
+numpy==2.4.1              # math
+Pillow==10.1.0            # images
+pillow-heif==1.2.0        # heic format
+pandas==2.2.0             # csv
+pytest==7.4.4             # unit test
+pytest-cov==4.1.0         # test cov
+fastapi==0.109.0          # api
+uvicorn==0.27.0           # server
+pydantic==2.5.0           # validasyon
+python-json-logger==2.0.7 # loglama

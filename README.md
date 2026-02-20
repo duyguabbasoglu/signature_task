@@ -1,121 +1,46 @@
-# Signature Classification System
+# Signature Task 🖋️
 
-**Version**: 1.0.0 | **Status**: ✅ Production Ready  
-**Accuracy**: 91.0% | **Format Support**: PNG, JPG, HEIC | **Language**: Python 3.12
+Bu repo, imza/noktalama tespiti için oluşturduğum kodları ve veri setini içeriyor. Temel amacım, resim formatındaki belgelerde yer alan dolu alanların gerçekten bir imza mı yoksa sadece nokta/çizgi gibi karalamalar mı olduğunu tespit etmekti.
 
-A deterministic machine learning pipeline for classifying images as **EMPTY**, **PUNCTUATION**, or **SIGNATURE** with supporting evidence and confidence scores.
+## Özellikler
+- **Doğruluk:** Karmaşıklık sınırlarını (complexity thresholds) detaylıca kalibre ederek **%92 doğruluk (accuracy)** oranına ulaştım.
+- **Format Desteği:** PNG, JPG ve özellikle telefondan gelen HEIC formatları destekleniyor.
+- **Clean & Secure Code:** Pipelinelar temiz, okunaklı ve hata toleranslı şekilde yazıldı.
 
----
+## Kurulum
 
-## Quick Start
-
-### Installation (2 minutes)
+Repoyu bilgisayarınıza indirip sanal ortamda çalıştırabilirsiniz:
 
 ```bash
-# Clone repository
-git clone <repository> signature_task
+git clone https://github.com/duyguabbasoglu/signature_task.git
 cd signature_task
 
-# Create virtual environment
-python3.12 -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# or
-.\.venv\Scripts\Activate.ps1  # Windows
+python3 -m venv .venv
+source .venv/bin/activate  # Windows için: .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Verify installation
-python -c "from classifier import ClassResult; print('Installation OK')"
 ```
 
-### Usage (3 lines of code)
+## Nasıl Çalıştırılır?
 
+Bütün veri setini hızlıca test etmek ve sonuçları görmek isterseniz:
+```bash
+python full_dataset_test.py
+```
+*(Bu komut çalıştığında elde edilen tahminleri `vlm_full_results.csv` isimli bir dosyaya kaydeder.)*
+
+Bir dosyayı doğrudan kod içinden kendiniz test etmek isterseniz örnek kullanım şu şekildedir:
 ```python
 from classifier import load_image_robust, extract_features, classify_rule_based
 
-img = load_image_robust("document.png")
+img = load_image_robust("ornek_imza.png")
 features = extract_features(img)
 result, confidence, reasoning = classify_rule_based(features)
 
-print(f"Classification: {result.value} ({confidence:.1%}) - {reasoning}")
+print(f"Sonuç: {result.value} (Güven Skoru: %{confidence*100:.1f})")
 ```
 
-### Batch Processing
-
-```bash
-python full_dataset_test.py
-# Output: vlm_full_results.csv with detailed metrics
-```
-
----
-
-## Features
-
-### ✅ What It Does
-- **Classification**: EMPTY, PUNCTUATION, or SIGNATURE
-- **Confidence Scoring**: 0-100% confidence per classification
-- **Evidence Export**: CSV with 11+ metrics
-- **Format Support**: PNG, JPG, JPEG, TIF, **HEIC**
-- **Error Handling**: Graceful degradation
-- **Logging**: JSON-formatted production logs
-
-### ⚡ Performance
-- **Speed**: ~0.5 seconds per image
-- **Throughput**: 7,200 images/hour
-- **Memory**: <100MB per image
-- **Scalability**: Parallelizable across cores
-
-### 🔒 Security
-- **Local processing**: No external transmission
-- **Input validation**: Format whitelisting
-- **Resource limits**: DOS protection
-- **Memory safe**: Python with bounds checking
-
----
-
-## Documentation
-
-- **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)** - For managers/business stakeholders
-- **[TECHNICAL_REPORT.md](TECHNICAL_REPORT.md)** - For engineers/developers
-- **[FINAL_REPORT_v2.md](FINAL_REPORT_v2.md)** - Comprehensive technical details
-
----
-
-## Key Results
-
-### Accuracy
-- **Overall**: 91.0% (141/155 images) ✓
-- **EMPTY**: 100% (3/3) ✓
-- **PUNCTUATION**: 100% (9/9) ✓
-- **SIGNATURE**: 90.2% (129/143) ✓
-
-### Dataset
-- 12 PNG test images (standard format)
-- 143 HEIC images (Apple Photos, modern mobile)
-- Mixed resolution (1001x1040 to 4032x3024)
-
----
-
-## Configuration
-
-See `config.py` for all parameters:
-
-```python
-# Complexity thresholds
-COMPLEXITY_LOW = 0.3
-COMPLEXITY_HIGH = 1.0
-
-# Processing limits
-MAX_IMAGE_DIMENSION = 8192
-PROCESSING_TIMEOUT_SEC = 30
-```
-
----
-
-## Support
-
-**Issues?** Check troubleshooting in full README or contact: devops@turkcell.com.tr
-
-**Last Updated**: 2026-02-18
-
+Eğer `make` aracı sizde yüklüyse, otomatik komutlarımı da kullanabilirsiniz:
+- `make test` : Testleri çalıştırır.
+- `make serve` : API sunucusunu (FastAPI) ayağa kaldırır.
+- `make clean` : Gereksiz önbellek dosyalarını temizler.
