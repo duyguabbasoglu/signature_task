@@ -1,46 +1,28 @@
-# Signature Task 🖋️
+Bu repo, imza/noktalama tespiti için oluşturduğum kodları ve veri setini içeriyor. Temel amacım, resim formatındaki belgelerde imza için ayrılan bound boxların tespiti ve malum alanların gerçekten bir imza mı yoksa sadece nokta/çizgi gibi karalamalar mı olduğunu tespit etmektedir, doğruluk oranı %97.5'tir.
 
-Bu repo, imza/noktalama tespiti için oluşturduğum kodları ve veri setini içeriyor. Temel amacım, resim formatındaki belgelerde yer alan dolu alanların gerçekten bir imza mı yoksa sadece nokta/çizgi gibi karalamalar mı olduğunu tespit etmekti.
-
-## Özellikler
-- **Doğruluk:** Karmaşıklık sınırlarını (complexity thresholds) detaylıca kalibre ederek **%92 doğruluk (accuracy)** oranına ulaştım.
-- **Format Desteği:** PNG, JPG ve özellikle telefondan gelen HEIC formatları destekleniyor.
-- **Clean & Secure Code:** Pipelinelar temiz, okunaklı ve hata toleranslı şekilde yazıldı.
-
-## Kurulum
-
-Repoyu bilgisayarınıza indirip sanal ortamda çalıştırabilirsiniz:
-
-```bash
+# kurulum
+bash
 git clone https://github.com/duyguabbasoglu/signature_task.git
 cd signature_task
-
 python3 -m venv .venv
-source .venv/bin/activate  # Windows için: .\.venv\Scripts\Activate.ps1
-
+source .venv/bin/activate
+# .\.venv\Scripts\Activate.ps1 # windows için
 pip install -r requirements.txt
-```
 
-## Nasıl Çalıştırılır?
+# tüm veri seti üzerinden test
+python full_dataset_test.py # vlm_full_test_results.csv
 
-Bütün veri setini hızlıca test etmek ve sonuçları görmek isterseniz:
-```bash
-python full_dataset_test.py
-```
-*(Bu komut çalıştığında elde edilen tahminleri `vlm_full_results.csv` isimli bir dosyaya kaydeder.)*
-
-Bir dosyayı doğrudan kod içinden kendiniz test etmek isterseniz örnek kullanım şu şekildedir:
-```python
+# tekli test
+python
 from classifier import load_image_robust, extract_features, classify_rule_based
-
-img = load_image_robust("ornek_imza.png")
+img = load_image_robust("test_images/ornek_imza.png") # test edilecek görselin yolu
 features = extract_features(img)
 result, confidence, reasoning = classify_rule_based(features)
+print(f"Sınıflandırma: {result.value} (Güven Skoru: %{confidence*100:.1f})")
+print(f"Gerekçe: {reasoning}")
 
-print(f"Sonuç: {result.value} (Güven Skoru: %{confidence*100:.1f})")
-```
+# Alternatif: Makefile ile Hızlı Kullanım Eğer sisteminizde make kuruluysa, test komutları için hazırladığım kısayolları da kullanabilirsiniz
+Testleri çalıştırmak için: make test
+API sunucusunu ayağa kaldırmak için: make serve
+Önbellek/gereksiz dosyaları temizlemek için: make clean
 
-Eğer `make` aracı sizde yüklüyse, otomatik komutlarımı da kullanabilirsiniz:
-- `make test` : Testleri çalıştırır.
-- `make serve` : API sunucusunu (FastAPI) ayağa kaldırır.
-- `make clean` : Gereksiz önbellek dosyalarını temizler.
