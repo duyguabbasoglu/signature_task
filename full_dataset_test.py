@@ -21,6 +21,9 @@ from classifier import extract_features, classify_rule_based, ClassResult, load_
 EXPECTED_MAP = {
     # Empty
     'empty_': 'EMPTY',
+
+    'emp': 'EMPTY',  # emp.jpg, emp2.jpg (simple line drawings)
+
     # Punctuation
     'punct_': 'PUNCT',
     'dot': 'PUNCT',

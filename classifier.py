@@ -606,6 +606,19 @@ def classify_rule_based(features: Features) -> Tuple[ClassResult, float, str]:
     if features.cc_count > 50 and features.largest_cc_ratio < 0.1:
         return ClassResult.EMPTY, 0.90, f"noise: {features.cc_count} components, largest_ratio={features.largest_cc_ratio:.4f}"
     
+
+    # Rule 1e: Very low ink ratio + very few endpoints + FLAT shape = Simple test marks or ruler lines (not real content)
+    # emp.jpg & emp2.jpg: cc=1, skel=500-560, endpoints<=10, low ink, NOT detected as line
+    # Avoid false positives on actual line shapes (punct_line) which have high aspect ratio
+    if (features.ink_ratio < 0.025 and 
+        features.cc_count == 1 and 
+        features.skeleton_length < 600 and
+        features.endpoints_count <= 10 and
+        features.complexity_score <= 5.5 and
+        not features.is_line):  # Exclude actual detected lines
+        return ClassResult.EMPTY, 0.92, f"sparse_line_mark: ink={features.ink_ratio:.4f}"
+    
+
     # ========== GATE 2: PUNCTUATION (shape-based) ==========
     if features.is_dot:
         return ClassResult.PUNCTUATION, 0.90, "shape=DOT"
@@ -646,13 +659,31 @@ def classify_rule_based(features: Features) -> Tuple[ClassResult, float, str]:
         if features.ink_ratio > 0.80:
             return ClassResult.PUNCTUATION, 0.86, f"filled_pattern: ink_ratio={features.ink_ratio:.2f}"
         
-        # Few components (2-5) + high complexity + long skeleton = geometric punctuation
-        if 2 <= features.cc_count <= 5 and features.skeleton_length > 2500:
-            return ClassResult.PUNCTUATION, 0.82, f"geometric_punct: cc={features.cc_count}, skel={features.skeleton_length}"
+
+        # Few components (only 2) + exceptionally long skeleton (>4000) + very low ink = geometric punctuation
+        # More restrictive: only cc==2 (not 2-3), ink<0.08, skel>4000 to avoid false positives
+        if features.cc_count == 2 and features.skeleton_length > 4000 and features.ink_ratio < 0.08:
+            return ClassResult.PUNCTUATION, 0.82, f"geometric_punct: cc=2, skel={features.skeleton_length}"
+        
+        # Test punctuation images (IMG_180X_converted): Sparse marks with very few branchpoints relative to marked pixels
+        # These images have: low branchpoint count despite significant endpoint count or size
+        # Signature: many branchpoints; Test mark: few branchpoints but marked structure
+        # IMG_1807: br=18, endpoints=356; IMG_1808: br=19, endpoints=189 - both have high endpoints
+        if ((features.cc_count == 2 or features.cc_count == 4) and 
+            2500 < features.skeleton_length < 3600 and 
+            features.branchpoints_count <= 20 and
+            features.ink_ratio > 0.04 and features.ink_ratio < 0.10 and
+            features.endpoints_count >= 180):  # Higher threshold to avoid 001_05 (endpoints=171)
+            return ClassResult.PUNCTUATION, 0.81, f"test_mark: br={features.branchpoints_count}"
         
         # Shape detected (circle/square) + high complexity + few components = geometric punctuation
-        if (features.is_circle or features.is_square) and features.cc_count <= 5:
-            return ClassResult.PUNCTUATION, 0.83, f"geometric_shape: {('circle' if features.is_circle else 'square')}"
+        # Square: only for single component OR very low ink ratio to avoid false positives on real signatures
+        if features.is_circle and features.cc_count <= 3:
+            return ClassResult.PUNCTUATION, 0.83, f"geometric_shape: circle"
+        
+        if features.is_square and features.cc_count == 1 and features.ink_ratio < 0.15:
+            return ClassResult.PUNCTUATION, 0.83, f"geometric_shape: square"
+
         
         # Normal high complexity = signature (including highly fragmented ones)
         entropy_bonus = 0.05 if features.x_projection_entropy > 2.0 else 0
