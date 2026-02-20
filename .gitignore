@@ -17,9 +17,9 @@ __pycache__/
 .idea/
 
 # Data files (do not commit test data)
-data/
-*.tif
-*.TIF
+# data/
+# *.tif
+# *.TIF
 
 # Logs
 *.log
